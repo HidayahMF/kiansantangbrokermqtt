@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@font-face {
+    font-family: 'medium';
+    src: url('../public/fonts/Montserrat-Medium.ttf');
+}
+
+@font-face {
+    font-family: 'extrabold';
+    src: url('../public/fonts/Montserrat-ExtraBold.ttf');
+}
+@font-face {
+    font-family: 'bold';
+    src: url('../public/fonts/Montserrat-Bold.ttf');
+}
+@font-face {
+    font-family: 'regular';
+    src: url('../public/fonts/Montserrat-Regular.ttf');
+}
+@font-face {
+    font-family: 'semibold';
+    src: url('../public/fonts/Montserrat-SemiBold.ttf');
+}
+
+@theme default {
+    --font-regular: 'regular',
+    --font-bold: 'bold',
+    --font-extrabold: 'extrabold',
+    --font-medium: 'medium',
+    --font-medium: 'semibold',
+    --color-bg: '#161616',
+    --color-text-primary: '#F1F6F8',
+    --color-text-secondary: '#21273D',
+
+}
+
+
