@@ -2,37 +2,62 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController
 {
+    /**
+     * Register a new user and return a JWT token.
+     */
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required',
+        $validated = $request->validate([
+            'name' => 'required|string',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
+            'nomer' => 'required|numeric',
+            'kecamatan' => 'required|string',
+            'kelurahan' => 'required|string',
+            'kodepos' => 'required|numeric',
         ]);
 
-        DB::table('users')->insert([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        $validated['password'] = Hash::make($validated['password']);
+        $user = User::create($validated);
 
-        return response()->json(['message' => 'Register success']);
+        $token = Auth::guard('api')->login($user);
+
+        return response()->json([
+            'message' => 'Register success',
+            'token' => $token,
+            'user' => $user,
+        ], 201);
     }
 
+    /**
+     * Authenticate a user by email/password and return a JWT token.
+     */
     public function login(Request $request)
     {
-        $user = DB::table('users')->where('email', $request->email)->first();
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        $token = Auth::guard('api')->attempt($credentials);
+
+        if (!$token) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        return response()->json(['message' => 'Login success', 'user' => $user]);
+        $user = User::where('email', $credentials['email'])->firstOrFail();
+
+        return response()->json([
+            'message' => 'Login success',
+            'token' => $token,
+            'user' => $user,
+        ]);
     }
 }

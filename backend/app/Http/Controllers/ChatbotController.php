@@ -7,25 +7,29 @@ use Illuminate\Http\Request;
 class ChatbotController
 {
     /**
-     * Display a listing of the resource.
+     * Return a keyword-matched chatbot reply.
      */
-
-     public function reply(Request $request)
+    public function reply(Request $request)
     {
-        $message = strtolower($request->input('message'));
-        $response = $this->getBotReply($message);
+        $message = strtolower((string) $request->input('message'));
 
-        return response()->json(['reply' => $response]);
+        $reply = $this->getBotReply($message);
+
+        return response()->json(['reply' => $reply]);
     }
 
-    private function getBotReply($message)
+    private function getBotReply(string $message): string
     {
-        $path = base_path('dataset/chatbot_dataset.json');
-        $dataset = json_decode(file_get_contents($path), true);
+        $path = config('chatbot.dataset_path');
+        $dataset = $this->loadDataset($path);
 
         foreach ($dataset as $data) {
+            if (!isset($data['keywords'], $data['reply']) || !is_array($data['keywords'])) {
+                continue;
+            }
+
             foreach ($data['keywords'] as $keyword) {
-                if (strpos($message, strtolower($keyword)) !== false) {
+                if (strpos($message, strtolower((string) $keyword)) !== false) {
                     return $data['reply'];
                 }
             }
@@ -34,57 +38,19 @@ class ChatbotController
         return "Maaf, aku belum tahu tentang itu 😅. Coba tanyakan tentang emisi karbon atau efek rumah kaca!";
     }
 
-
-    public function index()
+    private function loadDataset(string $path): array
     {
-        //
-    }
+        if (!is_file($path)) {
+            abort(503, 'Chatbot dataset is not available.');
+        }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
+        $contents = file_get_contents($path);
+        $dataset = json_decode((string) $contents, true);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
+        if (!is_array($dataset)) {
+            abort(503, 'Chatbot dataset is not available.');
+        }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return $dataset;
     }
 }

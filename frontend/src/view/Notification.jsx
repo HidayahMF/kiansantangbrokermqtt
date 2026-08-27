@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../config";
 
 const Notification = () => {
-  const [records, setRecords] = useState([]);
+  const [, setRecords] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
   // Ambil data dari API tiap 5 detik
   useEffect(() => {
     const loadData = async () => {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/inputemission");
+        const res = await axios.get(`${API_BASE_URL}/api/inputemission`);
         const data = res.data.slice(-24); // ambil 24 data terakhir (1 hari)
         setRecords(data);
         generateNotifications(data);

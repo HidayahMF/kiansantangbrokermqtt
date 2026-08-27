@@ -1,25 +1,35 @@
 <?php
 
-use App\Models\User;
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-$email = env('ADMIN_EMAIL');
-$password = env('ADMIN_PASSWORD');
+class UserSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $email = (string) env('ADMIN_EMAIL');
+        $password = (string) env('ADMIN_PASSWORD');
 
-if (empty($email) || empty($password)) {
-    throw new RuntimeException(
-        'UserSeeder aborted: ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env.'
-    );
+        if ($email === '' || $password === '') {
+            throw new \RuntimeException(
+                'UserSeeder aborted: ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env.'
+            );
+        }
+
+        // The `users` table requires address columns for every record, so the
+        // bootstrap Admin row receives neutral placeholder values for them.
+        DB::table('users')->updateOrInsert(
+            ['email' => $email],
+            [
+                'name' => 'Admin',
+                'password' => bcrypt($password),
+                'nomer' => 0,
+                'kecamatan' => '-',
+                'kelurahan' => '-',
+                'kodepos' => 0,
+            ]
+        );
+    }
 }
-
-DB::table('users')->updateOrInsert(
-    ['email' => $email],
-    [
-        'name' => 'Admin',
-        'password' => bcrypt($password),
-    ]
-);
-
-// Optional sample users. NOTE: update UserFactory below to populate every
-// required column (nomer, kecamatan, kelurahan, kodepos) before enabling.
-// User::factory(5)->create();

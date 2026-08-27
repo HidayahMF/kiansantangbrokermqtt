@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
+import { API_BASE_URL } from "../config";
 
-const API_URL = "http://localhost:8000/api/devices"; // Ganti sesuai route Laravel kamu
+const API_URL = `${API_BASE_URL}/api/devices`;
 
 const Sensor = () => {
   const [devices, setDevices] = useState([]);

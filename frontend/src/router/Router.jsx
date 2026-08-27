@@ -2,6 +2,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import Login from "../view/Login";
 import Dashboard from "../view/Dashboard";
 import Overview from "../view/Overview/Overview";
 import Sensor from "../view/Sensor";
@@ -17,6 +18,7 @@ const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<Login />} />
         <Route
           path="/*"
           element={

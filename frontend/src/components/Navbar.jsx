@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = ({ onToggleSidebar }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleMenuClick = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -16,10 +18,16 @@ const Navbar = ({ onToggleSidebar }) => {
 
      
       <div className="hidden sm:flex items-center space-x-3">
-        <button className="font-extrabold bg-[#23252b] hover:bg-[#2e323a] text-white px-5 py-2 rounded-xl transition">
+        <button
+          onClick={() => navigate("/login")}
+          className="font-extrabold bg-[#23252b] hover:bg-[#2e323a] text-white px-5 py-2 rounded-xl transition"
+        >
           Daftar
         </button>
-        <button className="font-extrabold bg-[#23252b] hover:bg-[#2e323a] text-white px-5 py-2 rounded-xl transition">
+        <button
+          onClick={() => navigate("/login")}
+          className="font-extrabold bg-[#23252b] hover:bg-[#2e323a] text-white px-5 py-2 rounded-xl transition"
+        >
           Login
         </button>
       </div>

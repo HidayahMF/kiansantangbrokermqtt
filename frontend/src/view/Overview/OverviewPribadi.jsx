@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 import axios from "axios";
+import { API_BASE_URL } from "../../config";
 
 const TooltipContent = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -34,7 +35,7 @@ const OverviewPribadi = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/inputemission");
+        const res = await axios.get(`${API_BASE_URL}/api/inputemission`);
         setRecords(res.data);
       } catch (error) {
         console.error("Gagal mengambil data:", error);

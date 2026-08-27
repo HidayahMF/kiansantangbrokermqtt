@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Device;
 use App\Models\Devices;
 use Illuminate\Http\Request;
 
@@ -19,6 +18,11 @@ class DevicesController
             'name' => 'required|string|max:255',
         ]);
         return Devices::create($validated);
+    }
+
+    public function show(Devices $device)
+    {
+        return $device;
     }
 
     public function update(Request $request, Devices $device)

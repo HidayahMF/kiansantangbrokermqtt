@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../config";
 import {
   AreaChart,
   Area,
@@ -27,7 +28,7 @@ const TooltipContent = ({ active, payload, label }) => {
 const Dashboard = () => {
   const [data, setData] = useState(null);
   const [records, setRecords] = useState([]);
-  const [coords, setCoords] = useState(null);
+  const [, setCoords] = useState(null);
   const [city, setCity] = useState("Mengambil lokasi...");
   const [error, setError] = useState("");
 
@@ -40,7 +41,7 @@ const Dashboard = () => {
 
   const loadData = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/inputemission");
+      const res = await axios.get(`${API_BASE_URL}/api/inputemission`);
       const allData = res.data;
       setRecords(allData);
       const last = allData[allData.length - 1];

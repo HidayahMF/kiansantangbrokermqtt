@@ -7,6 +7,7 @@ import {
   Popup,
 } from "react-leaflet";
 import axios from "axios";
+import { API_BASE_URL } from "../../config";
 
 const OverviewKota = () => {
   const [coords, setCoords] = useState(null);
@@ -28,7 +29,7 @@ const OverviewKota = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/inputemission");
+        const res = await axios.get(`${API_BASE_URL}/api/inputemission`);
         const latest = res.data.at(-1);
         setSensorData(latest);
       } catch (err) {

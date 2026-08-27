@@ -2,11 +2,25 @@
 
 return [
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', '*'],
+    'paths' => ['api/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    /*
+    |--------------------------------------------------------------------------
+    | Allowed request origins
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated list. Defaults to the local Vite development origins for
+    | the two React apps. Override via the CORS_ALLOWED_ORIGINS env variable
+    | (e.g. "https://app.oxyvia.com,https://admin.oxyvia.com").
+    |
+    */
+
+    'allowed_origins' => array_filter(array_map('trim', explode(
+        ',',
+        env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
+    ))),
 
     'allowed_origins_patterns' => [],
 

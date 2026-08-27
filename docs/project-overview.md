@@ -39,6 +39,6 @@ Four cooperating components:
 | Claim | Status |
 | ----- | ------ |
 | End-to-end sensor ingestion → MySQL → API → dashboard | VERIFIED (from code) |
-| JWT auth fully functional (token issued at login) | NEEDS_CONFIRMATION — guard configured but `login` returns no token |
-| MQTT path fully functional | NEEDS_CONFIRMATION — references a missing `SensorReading` model |
+| JWT auth fully functional (token issued at login/register) | VERIFIED — `POST /api/login` / `POST /api/register` issue signed tokens (covered by tests) |
+| MQTT path fully functional | VERIFIED — subscriber + `sensor_readings` model/table present; end-to-end requires a live broker |
 | Who built each component | NEEDS_CONFIRMATION — single `Initial commit` by `HidayahMF`, no per-file history |

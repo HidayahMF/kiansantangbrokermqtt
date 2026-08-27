@@ -7,7 +7,7 @@ app = Flask(__name__)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_NAME = os.getenv("DB_NAME", "emissiondatabase")
+DB_NAME = os.getenv("DB_NAME", "energy_dashboard")
 
 if not DB_PASSWORD:
     raise RuntimeError(

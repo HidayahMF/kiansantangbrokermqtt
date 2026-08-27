@@ -79,4 +79,4 @@ flowchart TD
     CRASH -- no --> LOOP
 ```
 
-> **Caveat:** the persistence call in `MqttSubscribe` targets `App\Models\SensorReading`, which is **not present** in the repository. This flow is documented as written in the code, but will not run correctly until that model/table exists.
+> The persistence call in `MqttSubscribe` targets `App\Models\SensorReading`, which maps to the `sensor_readings` table created by the migration `2026_08_27_000002_create_sensor_readings_table.php`.

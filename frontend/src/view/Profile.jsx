@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../config";
 import { FaMapMarkerAlt, FaUserCircle } from "react-icons/fa";
 
 const Profile = () => {
@@ -19,7 +20,7 @@ const Profile = () => {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = "http://localhost:8000/api/devices"; // endpoint Laravel kamu
+  const API_URL = `${API_BASE_URL}/api/devices`;
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -38,10 +39,6 @@ const Profile = () => {
   // Hitung total emisi
   const totalDaily = devices.reduce(
     (acc, d) => acc + parseFloat(d.daily || 0),
-    0
-  );
-  const totalWeekly = devices.reduce(
-    (acc, d) => acc + parseFloat(d.weekly || 0),
     0
   );
   const totalMonthly = devices.reduce(

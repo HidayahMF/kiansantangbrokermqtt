@@ -45,8 +45,12 @@ Testing — Pest / PHPUnit harness (boilerplate)
 
 ## Known Gaps Noted During Analysis
 
-- `SensorReading` model referenced by the MQTT subscriber is missing.
-- `inputemission` table has no migration (created externally by the Python service).
-- JWT token is configured but not issued on login.
-- Backend chatbot dataset file (`dataset/chatbot_dataset.json`) is absent; frontend uses an inline dataset.
-- Hardcoded API base URLs in the frontends.
+The items below were open gaps during the original analysis and have since been closed in the current codebase:
+
+- ~~`SensorReading` model referenced by the MQTT subscriber is missing.~~ → Added model + `sensor_readings` migration.
+- ~~`inputemission` table has no migration.~~ → Added `create_inputemission_table` migration.
+- ~~JWT token is configured but not issued on login.~~ → `POST /api/login` / `POST /api/register` now issue signed JWT tokens.
+- ~~Backend chatbot dataset file (`dataset/chatbot_dataset.json`) is absent.~~ → Dataset added (same content as the frontend's inline dataset); missing-file cases return 503 gracefully.
+- ~~Hardcoded API base URLs in the frontends.~~ → Moved to `VITE_API_BASE_URL` (`src/config.js` + `.env.example`).
+
+Remaining limitations are documented in `docs/api.md` (Current Limitations).
