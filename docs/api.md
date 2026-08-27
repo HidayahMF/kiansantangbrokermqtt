@@ -1,77 +1,762 @@
-# API Overview — Oxyvia Backend
+# API Documentation — Oxyvia
 
-Base URL (as used by the frontends): `http://127.0.0.1:8000` (hardcoded in the React apps).
+Oxyvia is an IoT data platform that collects carbon-emission (CO₂) and energy sensor readings, stores them in MySQL, and serves them to browser dashboards through a Laravel REST API. Sensor hardware reports readings over HTTP to a Python (Flask) ingestion service; the Laravel API then exposes that data — together with user and device management and a keyword-matched carbon chatbot — to two React applications.
 
-All routes below are the **only** routes actually registered in `backend/routes/api.php`.
+This document describes **the endpoints that are actually registered and callable** in this repository.
+
+---
+
+## Table of Contents
+
+- [Services & Base URLs](#services--base-urls)
+- [API Overview](#api-overview)
+- [Authentication](#authentication)
+- [Endpoint Reference](#endpoint-reference)
+- [Python Ingestion Service](#python-ingestion-service)
+- [MQTT Integration](#mqtt-integration)
+- [Frontend Integration](#frontend-integration)
+- [Validation Rules](#validation-rules)
+- [Error Handling](#error-handling)
+- [Current Limitations](#current-limitations)
+
+---
+
+## Services & Base URLs
+
+The system runs three cooperating services. The URLs below are the **local development** URLs configured in the repository; no production URLs are defined.
+
+| Service                      | Base URL            | How to start it                                              |
+| ---------------------------- | ------------------- | ------------------------------------------------------------ |
+| Laravel REST API             | `http://127.0.0.1:8000` | `cd backend && php artisan serve`                         |
+| Python ingestion service     | `http://127.0.0.1:5000` | `cd python && python toSQL.py`                             |
+| MQTT broker (external)       | configurable via `.env` | `cd backend && php artisan mqtt:subscribe` |
+
+- All Laravel endpoints live under the `/api` prefix, e.g. `GET http://127.0.0.1:8000/api/inputemission`.
+- The Python ingestion service listens on port `5000` and is a separate HTTP server (see [Python Ingestion Service](#python-ingestion-service)).
+- The MQTT broker is not an HTTP API — it is consumed by the Laravel subscriber (see [MQTT Integration](#mqtt-integration)).
+
+The React frontends currently **hardcode** these base URLs (both `http://127.0.0.1:8000` and `http://localhost:8000` are used across components). See [Frontend Integration](#frontend-integration) for the exact location of every reference.
+
+---
+
+## API Overview
+
+All endpoints below are registered in `backend/routes/api.php` (Laravel) or `python/toSQL.py` (Flask).
+
+### Laravel REST API
+
+| Method | Endpoint             | Description                                                |
+| ------ | -------------------- | ---------------------------------------------------------- |
+| GET    | `/api/inputemission` | List sensor readings, newest first                        |
+| POST   | `/api/chat`          | Get a keyword-matched chatbot reply                        |
+| GET    | `/api/users`         | List all users                                             |
+| POST   | `/api/users`         | Create a user                                             |
+| GET    | `/api/users/{id}`    | Show a single user                                         |
+| PUT/PATCH | `/api/users/{id}` | Update a user                                              |
+| DELETE | `/api/users/{id}`    | Delete a user                                              |
+| GET    | `/api/devices`       | List devices                                               |
+| POST   | `/api/devices`       | Create a device                                            |
+| PUT/PATCH | `/api/devices/{id}` | Update a device                                          |
+| DELETE | `/api/devices/{id}`  | Delete a device                                            |
+
+> **Note:** the route `GET /api/devices/{id}` is also registered by `Route::apiResource('devices', ...)`, but the controller has **no `show()` method**, so this route is not usable (it raises an exception). It is **not** listed above. See [Current Limitations](#current-limitations).
+
+### Python Ingestion Service
+
+| Method | Endpoint    | Description                                        |
+| ------ | ----------- | -------------------------------------------------- |
+| GET    | `/insert`   | Ingest one sensor reading via query parameters    |
+
+---
 
 ## Authentication
 
-> **Not available as public endpoints.** `AuthController` defines `login()` and `register()` methods, but **no `/api/login` or `/api/register` route is registered** — a request to these paths returns 404. Documented here for completeness of the controller's intended behavior:
+**Authentication endpoints are not currently registered.** The `AuthController` defines `login()` and `register()` methods, but no `/api/login` or `/api/register` route exists, so these methods cannot be reached through the API.
 
-### `login()` / `register()` (AuthController — NOT routed)
+As a result:
 
-- `login`: validates credentials via `Hash::check`; would return `{ "message": "Login success", "user": {...} }` (200) or `{ "message": "Invalid credentials" }` (401). Does **not** return a JWT token.
-- `register`: validates `name`/`email`/`password`, hashes password with `Hash::make`; would return `{ "message": "Register success" }`.
-- Source: `backend/app/Http/Controllers/AuthController.php`
-- **Reachability:** unrouted → currently 404. See README Limitations.
+- Every endpoint in this document is **public** — no bearer token, API key, or session is required.
+- No route applies authentication middleware.
+- A JWT `api` guard is configured (`config/auth.php`, `tymon/jwt-auth`), but no token is issued anywhere in the application.
 
-## Data & Chat
+See [Current Limitations](#current-limitations).
 
-### `GET /api/inputemission`
-List input-emission readings, newest first.
+---
 
-- Source: `backend/app/Http/Controllers/Api/InputEmissionController.php::index`
-- Returns `InputEmission::orderBy('timestamp','desc')->get()`.
+## Endpoint Reference
 
-### `POST /api/chat`
-Keyword-matched chatbot reply.
+### GET /api/inputemission
 
-- Body: `{ "message": string }`
-- Source: `backend/app/Http/Controllers/ChatbotController.php::reply`
-- Reads `dataset/chatbot_dataset.json` (file not present in repo).
-- **200** → `{ "reply": string }`
+#### Description
 
-## Users (CRUD)
+Returns all input-emission sensor readings ordered from **newest to oldest by `timestamp`**.
 
-Routed via `Route::apiResource('users', UserController::class)` → `backend/app/Http/Controllers/Api/UserController.php`.
+Implementation: `InputEmission::orderBy('timestamp', 'desc')->get()`.
 
-| Method   | Endpoint          | Purpose                        |
-| -------- | ----------------- | ------------------------------ |
-| GET      | `/api/users`      | List all users                 |
-| POST     | `/api/users`      | Create user (hashes password)  |
-| GET      | `/api/users/{id}` | Show single user (404 if absent) |
-| PUT      | `/api/users/{id}` | Update user (password optional) |
-| DELETE   | `/api/users/{id}` | Delete user                     |
+There is **no pagination, filtering, or query-parameter support**. Every stored reading is returned in a single JSON array.
 
-`POST /api/users` fields: `name`, `email` (unique), `password` (min 6), `nomer`, `kecamatan`, `kelurahan`, `kodepos`.
+#### Request
 
-## Devices (CRUD)
+```
+GET /api/inputemission
+```
 
-Routed via `Route::apiResource('devices', DevicesController::class)` → `backend/app/Http/Controllers/DevicesController.php`.
+No request body. No query parameters.
 
-| Method   | Endpoint              | Purpose                 |
-| -------- | --------------------- | ----------------------- |
-| GET      | `/api/devices`        | List devices            |
-| POST     | `/api/devices`        | Create device (name required) |
-| PUT      | `/api/devices/{id}`   | Update device           |
-| DELETE   | `/api/devices/{id}`   | Delete device           |
+#### Response
 
-## Python Ingestion Endpoint (not Laravel)
+`200 OK` — a JSON array of reading objects:
 
-`python/toSQL.py` exposes `GET /insert` on port **5000**:
+```json
+[
+  {
+    "id": 42,
+    "timestamp": "2026-08-27 10:30:00",
+    "voltage": 220.4,
+    "current": 1.5,
+    "power": 330.0,
+    "energy": 10.2,
+    "frequency": 50.0,
+    "powerFactor": 0.95,
+    "tempAmbient": 28.0,
+    "tempObject": 32.5,
+    "CO2": 180.0
+  }
+]
+```
 
-- Query params: `voltage`, `current`, `power`, `energy`, `freq`, `pf`, `ambient`, `object`, `CO2` (all required).
-- Inserts into MySQL `inputemission`.
-- **200** → `Success save to MySQL`; **400** if params incomplete; **500** on DB error.
+When no readings exist, the response is an empty array `[]`.
 
-## Verified Endpoint Summary
+#### Status Codes
 
-| Method | Endpoint             | Layer                |
-| ------ | -------------------- | -------------------- |
-| GET    | `/api/inputemission` | Laravel              |
-| POST   | `/api/chat`          | Laravel              |
-| GET/POST/PUT/DELETE | `/api/users{/?id}` | Laravel   |
-| GET/POST/PUT/DELETE | `/api/devices{/?id}` | Laravel  |
-| GET    | `/insert`            | Python Flask (raw query params) |
+| Status | Meaning                                   |
+| ------ | ----------------------------------------- |
+| 200    | Success — JSON array of readings          |
+| 500    | Server error (e.g. database failure)      |
 
-> `login()`/`register()` (AuthController) are **not** registered as routes and are intentionally excluded from this list.
+---
+
+### POST /api/chat
+
+#### Description
+
+Returns a keyword-matched chatbot reply for the given message. The message is lowercased and compared against the keyword list in `backend/dataset/chatbot_dataset.json` (a JSON array of `{ keywords: [], reply: "" }` objects). The first keyword match wins; if nothing matches, a default fallback reply is returned.
+
+#### Request
+
+```json
+{
+  "message": "apa itu emisi karbon?"
+}
+```
+
+`message` is the only accepted field. There is **no validation** — a missing or empty `message` simply does not match any keyword and returns the fallback reply.
+
+#### Response
+
+`200 OK` — a JSON object with a single `reply` field:
+
+```json
+{
+  "reply": "Emisi karbon adalah gas CO₂ yang dilepaskan ke atmosfer akibat aktivitas manusia seperti kendaraan bermotor, industri, dan pembangkit listrik."
+}
+```
+
+#### Status Codes
+
+| Status | Meaning                                                       |
+| ------ | ------------------------------------------------------------- |
+| 200    | Success — matched or fallback reply                          |
+| 500    | Server error — **occurs if `dataset/chatbot_dataset.json` is missing** |
+
+> **Important:** `backend/dataset/chatbot_dataset.json` is **not present** in this repository. Until the file is added, this endpoint fails with a 500 error. The React dashboard does **not** use this endpoint — its chatbot is entirely client-side (see [Current Limitations](#current-limitations)).
+
+---
+
+### Users
+
+Users are managed through a standard resource controller (`UserController`). The `User` model masks the `password` field, so it is **never included in any response**.
+
+#### GET /api/users
+
+##### Description
+
+Lists all users.
+
+##### Request
+
+```
+GET /api/users
+```
+
+No body.
+
+##### Response
+
+`200 OK` — a JSON array of user objects:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Dimas Prasetyo",
+    "email": "dimas@example.com",
+    "nomer": 81234567,
+    "kecamatan": "Coblong",
+    "kelurahan": "Dago",
+    "kodepos": 40135,
+    "created_at": "2026-08-20T09:00:00.000000Z",
+    "updated_at": "2026-08-20T09:00:00.000000Z"
+  }
+]
+```
+
+##### Status Codes
+
+| Status | Meaning                          |
+| ------ | -------------------------------- |
+| 200    | Success — JSON array of users    |
+| 500    | Server error                     |
+
+---
+
+#### POST /api/users
+
+##### Description
+
+Creates a new user. The password is hashed (bcrypt) before storage; the response never contains it.
+
+All fields are **required**.
+
+##### Request
+
+```json
+{
+  "name": "Dimas Prasetyo",
+  "email": "dimas@example.com",
+  "password": "secret123",
+  "nomer": 81234567,
+  "kecamatan": "Coblong",
+  "kelurahan": "Dago",
+  "kodepos": 40135
+}
+```
+
+##### Response
+
+`201 Created` — the created user object (password excluded):
+
+```json
+{
+  "id": 5,
+  "name": "Dimas Prasetyo",
+  "email": "dimas@example.com",
+  "nomer": 81234567,
+  "kecamatan": "Coblong",
+  "kelurahan": "Dago",
+  "kodepos": 40135,
+  "created_at": "2026-08-27T10:00:00.000000Z",
+  "updated_at": "2026-08-27T10:00:00.000000Z"
+}
+```
+
+##### Status Codes
+
+| Status | Meaning                                    |
+| ------ | ------------------------------------------ |
+| 201    | Created — the new user object              |
+| 422    | Validation failed (see below)              |
+| 500    | Server error                               |
+
+##### Validation
+
+| Field        | Rules                                  |
+| ------------ | -------------------------------------- |
+| `name`       | required, string                       |
+| `email`      | required, valid email, **unique** `users.email` |
+| `password`   | required, minimum 6 characters         |
+| `nomer`      | required, numeric                      |
+| `kecamatan`  | required, string                       |
+| `kelurahan`  | required, string                       |
+| `kodepos`    | required, numeric                      |
+
+---
+
+#### GET /api/users/{id}
+
+##### Description
+
+Returns a single user by numeric `id`.
+
+##### Request
+
+```
+GET /api/users/5
+```
+
+No body.
+
+##### Response
+
+`200 OK` — the user object (password excluded).
+
+`404 Not Found` — if no user with that `id` exists:
+
+```json
+{
+  "message": "User not found"
+}
+```
+
+##### Status Codes
+
+| Status | Meaning                           |
+| ------ | --------------------------------- |
+| 200    | Success — the user object         |
+| 404    | User not found                    |
+| 500    | Server error                      |
+
+---
+
+#### PUT /api/users/{id}
+
+> `PATCH /api/users/{id}` is also accepted and handled identically (both are registered by `Route::apiResource`).
+
+##### Description
+
+Updates an existing user. All fields are **optional**; only the fields present in the request are updated. The email uniqueness rule excludes the user being updated.
+
+##### Request
+
+```json
+{
+  "name": "Dimas Prasetyo",
+  "email": "dimas.baru@example.com",
+  "password": "newsecret123",
+  "kodepos": 40132
+}
+```
+
+If `password` is provided (and non-empty), it is hashed (bcrypt) before storage. An omitted or empty `password` leaves the existing password unchanged. The response never contains the password.
+
+##### Response
+
+`200 OK` — the updated user object.
+
+`404 Not Found` — if the user does not exist (`{ "message": "User not found" }`).
+
+##### Status Codes
+
+| Status | Meaning                                    |
+| ------ | ------------------------------------------ |
+| 200    | Success — the updated user object          |
+| 404    | User not found                             |
+| 422    | Validation failed (e.g. email already used by another user) |
+| 500    | Server error                               |
+
+##### Validation
+
+| Field        | Rules                                              |
+| ------------ | -------------------------------------------------- |
+| `name`       | string (optional)                                  |
+| `email`      | valid email, **unique** except the current user (optional) |
+| `password`   | nullable, minimum 6 characters                     |
+| `nomer`      | numeric (optional)                                 |
+| `kecamatan`  | string (optional)                                  |
+| `kelurahan`  | string (optional)                                  |
+| `kodepos`    | numeric (optional)                                 |
+
+---
+
+#### DELETE /api/users/{id}
+
+##### Description
+
+Deletes a user by numeric `id`.
+
+##### Request
+
+```
+DELETE /api/users/5
+```
+
+No body.
+
+##### Response
+
+`200 OK`:
+
+```json
+{
+  "message": "User deleted successfully"
+}
+```
+
+`404 Not Found` — if the user does not exist (`{ "message": "User not found" }`).
+
+##### Status Codes
+
+| Status | Meaning                           |
+| ------ | --------------------------------- |
+| 200    | Deleted                           |
+| 404    | User not found                    |
+| 500    | Server error                      |
+
+---
+
+### Devices
+
+Devices are managed through a resource controller (`DevicesController`). A device currently has a single attribute: `name`.
+
+#### GET /api/devices
+
+##### Description
+
+Lists all devices.
+
+##### Request
+
+```
+GET /api/devices
+```
+
+No body.
+
+##### Response
+
+`200 OK` — a JSON array of device objects:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Sensor Ruangan A",
+    "created_at": "2026-08-20T09:00:00.000000Z",
+    "updated_at": "2026-08-20T09:00:00.000000Z"
+  }
+]
+```
+
+##### Status Codes
+
+| Status | Meaning                           |
+| ------ | --------------------------------- |
+| 200    | Success — JSON array of devices   |
+| 500    | Server error                      |
+
+---
+
+#### POST /api/devices
+
+##### Description
+
+Creates a device. Returns the created device automatically serialized with a **200** status (the controller returns the model directly, not an explicit 201).
+
+##### Request
+
+```json
+{
+  "name": "Sensor Ruangan A"
+}
+```
+
+##### Response
+
+`200 OK` — the created device object:
+
+```json
+{
+  "id": 4,
+  "name": "Sensor Ruangan A",
+  "created_at": "2026-08-27T10:00:00.000000Z",
+  "updated_at": "2026-08-27T10:00:00.000000Z"
+}
+```
+
+##### Status Codes
+
+| Status | Meaning                                   |
+| ------ | ----------------------------------------- |
+| 200    | Success — the created device object       |
+| 422    | Validation failed (`name` required, max 255) |
+| 500    | Server error                              |
+
+---
+
+#### PUT /api/devices/{id}
+
+> `PATCH /api/devices/{id}` is also accepted (both registered by `Route::apiResource`). The `{id}` uses Laravel route-model binding: an id that does not exist yields `404`.
+
+##### Description
+
+Updates a device's name.
+
+##### Request
+
+```json
+{
+  "name": "Sensor Ruangan A - Updated"
+}
+```
+
+##### Response
+
+`200 OK` — the updated device object.
+
+##### Status Codes
+
+| Status | Meaning                                   |
+| ------ | ----------------------------------------- |
+| 200    | Success — the updated device object       |
+| 404    | Device not found                          |
+| 422    | Validation failed (`name` required, max 255) |
+| 500    | Server error                              |
+
+---
+
+#### DELETE /api/devices/{id}
+
+##### Description
+
+Deletes a device. Uses route-model binding; a non-existent `id` yields `404`.
+
+##### Request
+
+```
+DELETE /api/devices/4
+```
+
+No body.
+
+##### Response
+
+`204 No Content` — the response body is empty.
+
+##### Status Codes
+
+| Status | Meaning          |
+| ------ | ---------------- |
+| 204    | Deleted, no body |
+| 404    | Device not found |
+| 500    | Server error     |
+
+---
+
+### GET /api/devices/{id} (not implemented)
+
+The `GET /api/devices/{id}` route is registered by `Route::apiResource('devices', ...)`, but `DevicesController` does not define a `show()` method. Calling this route raises an unhandled exception (HTTP 500). Do not rely on it. See [Current Limitations](#current-limitations).
+
+---
+
+## Python Ingestion Service
+
+`python/toSQL.py` is a Flask application that receives sensor readings over HTTP and writes them directly to the `inputemission` table in MySQL, bypassing the Laravel application.
+
+### GET /insert
+
+#### Description
+
+Inserts a single sensor reading. All parameters are passed as **query parameters** (the endpoint only supports `GET`; it does not accept JSON bodies).
+
+All nine parameters are **required**. If any one is missing, the request is rejected.
+
+#### Request
+
+```
+GET /insert?voltage=220&current=1.5&power=330&energy=10&freq=50&pf=0.95&ambient=25&object=device&CO2=100
+```
+
+| Parameter | Description                        | Required |
+| --------- | ---------------------------------- | -------- |
+| `voltage` | Voltage in volts                  | yes      |
+| `current` | Current in amperes                | yes      |
+| `power`   | Power in watts                    | yes      |
+| `energy`  | Energy in kWh                     | yes      |
+| `freq`    | Frequency in Hz                   | yes      |
+| `pf`      | Power factor                      | yes      |
+| `ambient` | Ambient temperature in °C         | yes      |
+| `object`  | Object temperature in °C          | yes      |
+| `CO2`     | CO₂ concentration                 | yes      |
+
+#### Example
+
+```bash
+curl "http://127.0.0.1:5000/insert?voltage=220&current=1.5&power=330&energy=10&freq=50&pf=0.95&ambient=25&object=device&CO2=100"
+```
+
+#### Database Behavior
+
+The service executes:
+
+```sql
+INSERT INTO inputemission
+(voltage, current, power, energy, frequency, powerFactor, tempAmbient, tempObject, CO2)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+```
+
+- The `timestamp` column is **not set by the service**; it relies on the database column's default value (e.g. `CURRENT_TIMESTAMP`) to be populated.
+- The `inputemission` table is **not created by any migration** in this repository — it must exist in MySQL (see [Current Limitations](#current-limitations)).
+
+#### Configuration
+
+The service reads its MySQL credentials from environment variables and refuses to start if `DB_PASSWORD` is not set:
+
+| Variable      | Default         | Purpose                       |
+| ------------- | --------------- | ----------------------------- |
+| `DB_HOST`     | `localhost`     | MySQL host                    |
+| `DB_USER`     | `root`          | MySQL user                    |
+| `DB_PASSWORD` | *(none — required)* | MySQL password            |
+| `DB_NAME`     | `emissiondatabase` | MySQL database name        |
+
+Copy `python/.env.example` to `python/.env` (or export the variables) before running.
+
+#### Status Codes
+
+| Status | Meaning                                                                  |
+| ------ | ------------------------------------------------------------------------ |
+| 200    | `Success save to MySQL` (plain text)                                     |
+| 400    | `Error: Parameter tidak lengkap` — one or more parameters missing        |
+| 500    | `Error save to MySQL: <detail>` — database write failed                  |
+
+---
+
+## MQTT Integration
+
+MQTT is part of the ingestion side of the system but is **not exposed over HTTP**. The Laravel backend acts as an **MQTT subscriber/client**, listening to an external MQTT broker.
+
+```mermaid
+flowchart LR
+    BROKER[(MQTT Broker)] -->|publish on topic| SUB[php artisan mqtt:subscribe]
+    SUB -->|SensorReading::create| DB[(MySQL)]
+    SENSOR[IoT Sensor] -->|HTTP GET /insert| PY[Python Flask :5000]
+    PY --> DB
+    API[Laravel API :8000] -->|GET /api/inputemission| DB
+    FE[React Dashboard] --> API
+```
+
+### Subscriber (`php artisan mqtt:subscribe`)
+
+- **Role:** MQTT client — connects to a broker and subscribes to a single topic.
+- **Behavior:** on each received message, it decodes the payload as JSON and persists it via `SensorReading::create(['topic' => ..., 'payload' => ...])`. If the payload is not JSON, it is stored as `['raw' => <message>]`.
+- **Resilience:** if the message loop errors, the client disconnects and reconnects (re-connecting and re-subscribing after a short delay).
+- **QoS:** subscribes with QoS `0`.
+- **Keep-alive:** 10 seconds.
+
+### Configuration
+
+The subscriber reads its settings from `.env`:
+
+| Variable          | Default                 | Purpose                          |
+| ----------------- | ----------------------- | -------------------------------- |
+| `MQTT_HOST`       | —                       | Broker host                      |
+| `MQTT_PORT`       | `1883`                  | Broker port                      |
+| `MQTT_TOPIC`      | `sensors/temperature`   | Topic to subscribe to            |
+| `MQTT_CLIENT_ID`  | `laravel_subscriber_<id>` | Client identifier              |
+| `MQTT_USER`       | —                       | Broker username (optional)       |
+| `MQTT_PASS`       | —                       | Broker password (optional)       |
+
+> **Important:** the subscriber persists messages through an `App\Models\SensorReading` model and `sensor_readings` table, **neither of which exists in this repository**. The connection and subscription logic runs, but saving a received message will fail. See [Current Limitations](#current-limitations).
+
+---
+
+## Frontend Integration
+
+Two React applications consume the Laravel API. **All base URLs are hardcoded** in the components — there is no environment-variable configuration.
+
+### Frontend base URL references
+
+| Application       | File(s)                      | Hardcoded URL                     | Endpoints used                             |
+| ----------------- | ---------------------------- | --------------------------------- | ------------------------------------------ |
+| `frontend/` (dashboard) | `view/Dashboard.jsx`, `view/Notification.jsx`, `view/Overview/OverviewPribadi.jsx`, `view/Overview/OverviewKota.jsx` | `http://127.0.0.1:8000` | `GET /api/inputemission` |
+| `frontend/` (dashboard) | `view/Sensor.jsx`, `view/Profile.jsx` | `http://localhost:8000` | `GET/POST/PUT/DELETE /api/devices` |
+| `frontend/` (dashboard) | `view/Settings.jsx` | `http://127.0.0.1:8000` | `GET` and `POST /api/users` |
+| `frontend-admin/`      | `view/Users.jsx`              | `http://127.0.0.1:8000`           | `GET /api/users`                           |
+
+Additional notes verified in the frontends:
+
+- `Dashboard.jsx` polls `GET /api/inputemission` on a **2-second interval** and renders the newest record.
+- The dashboard chatbot (`components/Chatbot.jsx`) is **fully client-side** — it matches keywords against an inline dataset in `src/constant/index.js` and makes **no API call**. The backend `POST /api/chat` is currently unused by the frontend.
+- `view/Login.jsx` posts to `http://127.0.0.1:8000/api/login`, but this view is **not wired into the router** and the route does not exist (see [Authentication](#authentication) and [Current Limitations](#current-limitations)).
+
+To point the frontends at a different backend, update the URLs listed above.
+
+---
+
+## Validation Rules
+
+Verified rules from the Laravel controllers:
+
+| Endpoint             | Field        | Rule                                         |
+| -------------------- | ------------ | -------------------------------------------- |
+| `POST /api/users`    | `name`       | required, string                             |
+| `POST /api/users`    | `email`      | required, valid email, unique in `users`     |
+| `POST /api/users`    | `password`   | required, min 6                              |
+| `POST /api/users`    | `nomer`      | required, numeric                            |
+| `POST /api/users`    | `kecamatan`  | required, string                             |
+| `POST /api/users`    | `kelurahan`  | required, string                             |
+| `POST /api/users`    | `kodepos`    | required, numeric                            |
+| `PUT/PATCH /api/users/{id}` | `password` | nullable, min 6                          |
+| `PUT/PATCH /api/users/{id}` | `email`   | valid email, unique except current user      |
+| `POST /api/devices`      | `name`    | required, string, max 255                    |
+| `PUT/PATCH /api/devices/{id}` | `name` | required, string, max 255                |
+
+`POST /api/chat` accepts any `message` value; there is no validation.
+
+---
+
+## Error Handling
+
+### Laravel validation errors (422)
+
+When a request fails validation, Laravel returns `422 Unprocessable Entity` with its default structure:
+
+```json
+{
+  "message": "The name field is required.",
+  "errors": {
+    "name": ["The name field is required."]
+  }
+}
+```
+
+This applies to `POST /api/users`, `PUT/PATCH /api/users/{id}`, `POST /api/devices`, and `PUT/PATCH /api/devices/{id}`.
+
+### Not found (404)
+
+- Users (`GET/PUT/DELETE /api/users/{id}`): a JSON body with a message, e.g. `{ "message": "User not found" }`.
+- Devices (`PUT/DELETE /api/devices/{id}`): Laravel's default model-binding 404 response (route-model binding fails).
+
+### Deletion
+
+- `DELETE /api/users/{id}` → `200` with `{ "message": "User deleted successfully" }`.
+- `DELETE /api/devices/{id}` → `204 No Content`, empty body.
+
+### Generic server errors (500)
+
+Unexpected exceptions (e.g. database failures) produce `500 Internal Server Error` with a JSON body.
+
+### Python ingestion service
+
+The Flask service returns plain-text bodies, not JSON:
+
+| Status | Body                                                     |
+| ------ | -------------------------------------------------------- |
+| 200    | `Success save to MySQL`                                  |
+| 400    | `Error: Parameter tidak lengkap`                         |
+| 500    | `Error save to MySQL: <error detail>`                    |
+
+---
+
+## Current Limitations
+
+These are real constraints present in the current source code:
+
+- **Authentication is not exposed.** `AuthController::login()` and `register()` exist but have no routes. Every API endpoint is public, and no token is issued anywhere.
+- **`GET /api/devices/{id}` is unusable.** The route is registered by `apiResource`, but `DevicesController` has no `show()` method, so the route throws an exception.
+- **`POST /api/chat` requires a missing dataset.** The handler reads `backend/dataset/chatbot_dataset.json`, which is not in the repository; the endpoint returns 500 until the file is provided.
+- **Frontend login is unwired.** `frontend/src/view/Login.jsx` posts to `/api/login`, but the view is not referenced by the router and the route does not exist.
+- **MQTT persistence is broken.** `MqttSubscribe` stores messages through the `SensorReading` model and table, which are not defined in the repository.
+- **`inputemission` has no migration.** The table is populated by the Python service (and referenced by `InputEmission`) but is not created by `php artisan migrate`.
+- **`POST /api/inputemission` is not routed.** `InputEmissionController::store()` exists (accepts `timestamp`, `voltage`, `current`, and optional numeric fields) but no route registers it. Ingestion is handled exclusively by the Python service.
+- **Hardcoded frontend base URLs.** The React apps hardcode `http://127.0.0.1:8000` / `http://localhost:8000`; there is no environment-variable configuration.
+- **CORS is configured only for local Vite dev origins.** `backend/config/cors.php` allows `http://localhost:5173` and `http://127.0.0.1:5173`.

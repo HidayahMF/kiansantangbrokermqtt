@@ -34,10 +34,6 @@ class UserController
         $validated['password'] = Hash::make($validated['password']);
         $user = User::create($validated);
 
-        $validated['password'] = Hash::make($validated['password']);
-
-        $user = User::create($validated);
-
         return response()->json($user, 201);
     }
 
