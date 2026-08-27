@@ -1,13 +1,25 @@
+import os
 from flask import Flask, request
 import mysql.connector
 
 app = Flask(__name__)
 
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_NAME = os.getenv("DB_NAME", "emissiondatabase")
+
+if not DB_PASSWORD:
+    raise RuntimeError(
+        "DB_PASSWORD environment variable is required. "
+        "Copy python/.env.example to python/.env and set DB_PASSWORD."
+    )
+
 db_config = {
-    "host": "localhost",
-    "user": "root",
-    "password": "***REMOVED***",
-    "database": "emissiondatabase"
+    "host": DB_HOST,
+    "user": DB_USER,
+    "password": DB_PASSWORD,
+    "database": DB_NAME,
 }
 
 @app.route('/insert', methods=['GET'])

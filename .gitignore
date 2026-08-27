@@ -1,0 +1,42 @@
+# ---- Secrets & credentials ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*.secret
+
+# ---- Generated dependencies & build output ----
+node_modules/
+vendor/
+dist/
+dist-ssr/
+build/
+coverage/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.python-version
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- IDE / OS ----
+.idea/
+.vscode/
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ---- OS / misc ----
+*.sqlite
+*.sqlite3
