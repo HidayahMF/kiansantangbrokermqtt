@@ -260,3 +260,7 @@ Environment variables (see `backend/.env.example`, `python/.env.example`, `front
 - [docs/product-flow.md](docs/product-flow.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/development-pipeline.md](docs/development-pipeline.md)
+
+## Development documentation
+
+- [Development pipeline](docs/development-pipeline.md) — code-grounded flow, source map, declared commands, validation plan, and current limitations.
